@@ -39,8 +39,10 @@ void write_ascii(Png *png){
 
 }   
 
-bool verify_png_header(char* buffer){
-    return memcmp(buffer, PNG_HEADER, PNG_HEADER_SIZE) == 0;
+bool verify_png_header(char* buffer, bool verbose){
+    bool is_png = memcmp(buffer, PNG_HEADER, PNG_HEADER_SIZE) == 0;
+    if(verbose) printf("is png\n");
+    return is_png;
 }
 
 uint32_t read_32_be(const unsigned char* p) {
@@ -165,10 +167,16 @@ int get_bytes_per_pixel(int color_type) {
     }
 }
 
-unsigned char* decompress_assembled_idat(Idat *assembled_idat, unsigned long expected_uncompressed_size){
+unsigned char* decompress_assembled_idat(Idat *assembled_idat, unsigned long expected_uncompressed_size, bool verbose){
 
     if (!assembled_idat || !assembled_idat->chunk_data || assembled_idat->length == 0) {
+        if(verbose) printf("No valid IDAT data to decompress\n");
         return NULL;
+    }
+
+    if(verbose) {
+        printf("Compressed size: %u bytes\n", assembled_idat->length);
+        printf("Expected decompressed size: %lu bytes\n", expected_uncompressed_size);
     }
 
     unsigned char *decompressed_data = malloc(expected_uncompressed_size);
@@ -182,10 +190,15 @@ unsigned char* decompress_assembled_idat(Idat *assembled_idat, unsigned long exp
     int status = uncompress(decompressed_data, &decompressed_len, 
                             assembled_idat->chunk_data, assembled_idat->length);
     if (status == Z_OK) {
-        printf("Decompression successful! Bytes written: %lu\n", expected_uncompressed_size);
+        if(verbose) printf("Decompression successful! Bytes written: %lu\n", decompressed_len);
         return decompressed_data;
-    } else {
-        printf("Decompression failed with error code: %d\n", decompressed_data);
+    } else if (status == Z_BUF_ERROR) {
+        if(verbose) printf("Buffer to small. Needed: %lu, Available: %lu\n", decompressed_data, expected_uncompressed_size);
+        free(decompressed_data);
+        return NULL;
+    }else{
+        if(verbose) printf("Decompression failed with error code: %d\n", status);
+        free(decompressed_data);
         return NULL;
     }
 
@@ -297,10 +310,15 @@ void convert_to_ascii(unsigned char *decompressed, Png *png) {
 int main(int argc, char *argv[]){
 
     if(argc<2){
-        printf("[usage]: ./main <image path>");
-        return;
+        printf("[usage]: ./main <image path> <optional:verbose (debugging)>");
+        return 1;
     }
     
+    bool verbose = false;
+    if(argc>=3){
+        verbose = (strcmp(argv[2], "true")==0);
+    }
+
     FILE *f = fopen(argv[1], "rb");
 
     if(!f){
@@ -309,25 +327,17 @@ int main(int argc, char *argv[]){
     }
 
     char *buffer = file_buffer(f);
-
-    
-    bool is_png = verify_png_header(buffer);
-    is_png ? printf("is png\n") : printf("isnt png\n");
+    bool is_png = verify_png_header(buffer, verbose);
 
     if (is_png) {  
         Png *png = extract_png_structure(buffer);
-        debug_png_info(png);
+        if(verbose) debug_png_info(png);
         Idat *assembled = assemble_idat(png);
         int bpp = get_bytes_per_pixel(png->color_type);
         unsigned long expected_size = png->height * (1+(png->width * bpp));
-        unsigned char *decompressed = decompress_assembled_idat(assembled,expected_size);
+        unsigned char *decompressed = decompress_assembled_idat(assembled,expected_size, verbose);
 
         if (decompressed) {
-            printf("Data buffer pointer location: %p\n", (void*)decompressed);
-            // for(int i=0; i<1000000; i++){
-            //     printf("%02X ", decompressed[i]);
-            //     if ((i + 1) % 20 == 0) printf("\n");
-            // }
             defilter_png(decompressed, png, bpp);
             convert_to_ascii(decompressed, png);
             free(decompressed);

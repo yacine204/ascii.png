@@ -1,2 +1,0 @@
-- [ ] support other formats (ppm, jpeg..etc)
-- [ ] refactor code to /headers /src

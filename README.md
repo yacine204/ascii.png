@@ -1,26 +1,33 @@
 # Ascii.png
 
-A from scratch PNG decoder and terminal renderer written in C.
+A from-scratch PNG/JPG decoder and terminal renderer written in C.
 
-Parses PNG chunks manually, decompresses IDAT data with zlib, applies all five PNG defiltering passes, then renders the result to your terminal using Unicode half-block characters with 24 bit true color ANSI escapes.
+Parses PNG/JPG chunks/markers manually, decompresses data (zlib for PNG, Huffman decoding for JPG), applies all required transformations, then renders the result to your terminal using Unicode half-block characters with 24-bit true color ANSI escapes.
 
 ![test_image](showcase.png)
 
-Features:
+## Features
+
+**PNG Support:**
 - Manual PNG chunk parsing (IHDR, IDAT, IEND)
 - Full filter reconstruction (None, Sub, Up, Average, Paeth)
-- True color output (16 million colors)
-- Half-block rendering for 2x vertical pixel density
-- Auto-scales to terminal size via ioctl
+- zlib decompression of IDAT data
 
-## Build:
+**JPG Support:**
+- Manual JPG marker parsing (SOF, DQT, DHT, SOS, EOI)
+- Huffman decoding (DC and AC coefficients)
+- Dequantization and IDCT (8x8 blocks)
+- YCbCr to RGB color conversion
+- Chroma subsampling (4:2:0, 4:2:2, 4:4:4)
+
+**Both Formats:**
+- True color output (16 million colors)
+- Half-block rendering for 2x vertical pixel density (▀)
+- Auto-scales to terminal size via ioctl
+- Automatic format detection (PNG vs JPG)
+- Verbose debugging mode
+
+## Build
 
 ```bash
-$ gcc main.c -o main -lz -lm
-```
-
-## Usage:
-
-```
-./main <image_path> <verbose:optional>
-```
+$ gcc -o image_viewer main.c png.c jpg.c -lm -lz -Iinclude

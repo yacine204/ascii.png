@@ -34,9 +34,10 @@ Idat *assemble_idat(Png *png);
 unsigned char* decompress_assembled_idat(Idat *assembled_idat, unsigned long expected_uncompressed_size, bool verbose);
 void debug_png_info(Png *png);
 void defilter_png(unsigned char *decompressed, Png *png, int bpp);
-void convert_png_to_ascii(unsigned char *decompressed, Png *png);
+void convert_png_to_ascii(unsigned char *decompressed, Png *png, const char *output_file);
 bool is_png_file(unsigned char *buffer);
 bool is_jpg_file(unsigned char *buffer);
 unsigned char* file_buffer_jpg(FILE *f, size_t *f_len);
+int save_ppm(const char *filename, unsigned char *rgb_data, int width, int height);
 
 #endif

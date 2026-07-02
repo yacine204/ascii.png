@@ -237,15 +237,57 @@ void defilter_png(unsigned char *decompressed, Png *png, int bpp) {
     }
 }
 
-void convert_png_to_ascii(unsigned char *decompressed, Png *png) {
+void convert_png_to_ascii(unsigned char *decompressed, Png *png, const char *output_path) {
     int bpp = get_bytes_per_pixel(png->color_type);
     size_t row_size = 1 + (png->width * bpp);
+    
 
     struct winsize w;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
     int term_w = w.ws_col > 0 ? w.ws_col : 200;
     int term_h = w.ws_row > 0 ? w.ws_row - 1 : 50;
+    
 
+    if (output_path) {
+        int save_width = term_w*2;
+        int save_height = term_h*2;
+        unsigned char *pixelated = malloc(save_width * save_height * 3);
+        if (!pixelated) {
+            perror("Could not allocate pixelated buffer");
+        }
+        
+        for (int ty = 0; ty < save_height; ty++) {
+            size_t y_top = (ty * 2) * png->height / (save_height * 2);
+            size_t y_bot = (ty * 2 + 1) * png->height / (save_height * 2);
+            
+            unsigned char *row_top = decompressed + (y_top * row_size) + 1;
+            unsigned char *row_bot = decompressed + (y_bot * row_size) + 1;
+            
+            for (int tx = 0; tx < save_width; tx++) {
+                size_t x = tx * png->width / save_width;
+                size_t idx = x * bpp;
+                size_t dst_idx = (ty * save_width + tx) * 3;
+                
+                uint8_t rt, gt, bt, rb, gb, bb;
+                if (bpp >= 3) {
+                    rt = row_top[idx]; gt = row_top[idx+1]; bt = row_top[idx+2];
+                    rb = row_bot[idx]; gb = row_bot[idx+1]; bb = row_bot[idx+2];
+                } else {
+                    rt = gt = bt = row_top[idx];
+                    rb = gb = bb = row_bot[idx];
+                }
+                
+                pixelated[dst_idx] = (rt + rb) / 2;
+                pixelated[dst_idx + 1] = (gt + gb) / 2;
+                pixelated[dst_idx + 2] = (bt + bb) / 2;
+            }
+        }
+        
+        save_ppm(output_path, pixelated, save_width, save_height);
+        free(pixelated);
+        printf("Saved PIXELATED version to: %s\n", output_path);
+    }
+    
     printf("\n");
     for (int ty = 0; ty < term_h; ty++) {
         size_t y_top = (ty * 2) * png->height / (term_h * 2);
@@ -258,8 +300,14 @@ void convert_png_to_ascii(unsigned char *decompressed, Png *png) {
             size_t x = tx * png->width / term_w;
             size_t idx = x * bpp;
 
-            uint8_t rt = row_top[idx], gt = row_top[idx+1], bt = row_top[idx+2];
-            uint8_t rb = row_bot[idx], gb = row_bot[idx+1], bb = row_bot[idx+2];
+            uint8_t rt, gt, bt, rb, gb, bb;
+            if (bpp >= 3) {
+                rt = row_top[idx]; gt = row_top[idx+1]; bt = row_top[idx+2];
+                rb = row_bot[idx]; gb = row_bot[idx+1]; bb = row_bot[idx+2];
+            } else {
+                rt = gt = bt = row_top[idx];
+                rb = gb = bb = row_bot[idx];
+            }
 
             printf("\033[38;2;%d;%d;%dm\033[48;2;%d;%d;%dm\xe2\x96\x80", 
                    rt, gt, bt, rb, gb, bb);

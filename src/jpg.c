@@ -761,12 +761,12 @@ void reconstruct_image(Sof *sof, Dht *dht, Sos *sos, unsigned char *merged_data,
 }
 
 unsigned char* decode_jpeg(Jpg *jpg, Sof *sof, Dqt *dqt, Dht *dht, Sos *sos, 
-                           size_t *image_size) {
+                           size_t *image_size, bool verbose) {
     size_t bitstream_size;
     unsigned char *merged = bitstream_loop(jpg, sos, jpg->sos_len + 10, &bitstream_size);
     if (!merged) return NULL;
     
-    printf("Bitstream size: %zu bytes\n", bitstream_size);
+    if(verbose) printf("Bitstream size: %zu bytes\n", bitstream_size);
     
     *image_size = sof->width * sof->height * 3;
     unsigned char *output = malloc(*image_size);
@@ -782,29 +782,79 @@ unsigned char* decode_jpeg(Jpg *jpg, Sof *sof, Dqt *dqt, Dht *dht, Sos *sos,
     return output;
 }
 
-void convert_jpg_to_ascii(unsigned char *rgb_image, int width, int height) {
+void convert_jpg_to_ascii(unsigned char *rgb_image, int width, int height, const char *output_path) {
+    if (!rgb_image) {
+        printf("Error: rgb_image is NULL!\n");
+        return;
+    }
+    
     struct winsize w;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
     int term_w = w.ws_col > 0 ? w.ws_col : 200;
     int term_h = w.ws_row > 0 ? w.ws_row - 1 : 50;
+
+    if (output_path) {
+        printf("Saving PPM to: %s\n", output_path);
+        printf("Dimensions: %dx%d\n", term_w, term_h);
+        
+        unsigned char *pixelated = malloc((size_t)term_w * term_h * 3);
+        if (!pixelated) {
+            perror("Could not allocate pixelated buffer");
+            return;
+        }
+        
+        for (int ty = 0; ty < term_h; ty++) {
+            size_t y_top = (ty * 2) * height / (term_h * 2);
+            size_t y_bot = (ty * 2 + 1) * height / (term_h * 2);
+
+            if (y_top >= height) y_top = height - 1;
+            if (y_bot >= height) y_bot = height - 1;
+            
+            unsigned char *row_top = rgb_image + (y_top * width * 3);
+            unsigned char *row_bot = rgb_image + (y_bot * width * 3);
+            
+            for (int tx = 0; tx < term_w; tx++) {
+                size_t x = tx * width / term_w;
+                if (x >= width) x = width - 1;
+                size_t idx = x * 3;
+                size_t dst_idx = ((size_t)ty * term_w + tx) * 3;
+                
+                // Average top and bottom rows
+                pixelated[dst_idx] = (row_top[idx] + row_bot[idx]) / 2;
+                pixelated[dst_idx + 1] = (row_top[idx+1] + row_bot[idx+1]) / 2;
+                pixelated[dst_idx + 2] = (row_top[idx+2] + row_bot[idx+2]) / 2;
+            }
+        }
+
+        int result = save_ppm(output_path, pixelated, term_w, term_h);
+        if (result == 0) {
+            printf("Successfully saved PPM to: %s\n", output_path);
+        } else {
+            printf("Failed to save PPM to: %s\n", output_path);
+        }
+        
+        free(pixelated);
+    }
 
     printf("\n");
     for (int ty = 0; ty < term_h; ty++) {
         size_t y_top = (ty * 2) * height / (term_h * 2);
         size_t y_bot = (ty * 2 + 1) * height / (term_h * 2);
         
+        if (y_top >= height) y_top = height - 1;
+        if (y_bot >= height) y_bot = height - 1;
+        
         unsigned char *row_top = rgb_image + (y_top * width * 3);
         unsigned char *row_bot = rgb_image + (y_bot * width * 3);
         
         for (int tx = 0; tx < term_w; tx++) {
             size_t x = tx * width / term_w;
+            if (x >= width) x = width - 1;
             size_t idx = x * 3;
             
-            uint8_t rt = row_top[idx], gt = row_top[idx+1], bt = row_top[idx+2];
-            uint8_t rb = row_bot[idx], gb = row_bot[idx+1], bb = row_bot[idx+2];
-            
             printf("\033[38;2;%d;%d;%dm\033[48;2;%d;%d;%dm\xe2\x96\x80", 
-                   rt, gt, bt, rb, gb, bb);
+                   row_top[idx], row_top[idx+1], row_top[idx+2],
+                   row_bot[idx], row_bot[idx+1], row_bot[idx+2]);
         }
         printf("\033[0m\033[K\n");
     }

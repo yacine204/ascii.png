@@ -104,9 +104,9 @@ void dequantize_block(int block[64], unsigned char *quant_table);
 void idct_8x8(int input[8][8], float output[8][8]);
 void ycbcr_to_rgb(int y, int cb, int cr, int *r, int *g, int *b);
 void reconstruct_image(Sof *sof, Dht *dht, Sos *sos, unsigned char *merged_data, size_t merged_size, unsigned char *output_image);
-unsigned char* decode_jpeg(Jpg *jpg, Sof *sof, Dqt *dqt, Dht *dht, Sos *sos, size_t *image_size);
-void convert_jpg_to_ascii(unsigned char *rgb_image, int width, int height);
+unsigned char* decode_jpeg(Jpg *jpg, Sof *sof, Dqt *dqt, Dht *dht, Sos *sos, size_t *image_size, bool verbose);
+void convert_jpg_to_ascii(unsigned char *rgb_image, int width, int height,const char *output_file);
 void debug_jpg(Jpg *jpg);
 bool is_jpg_file(unsigned char *buffer);
-
+int save_ppm(const char *filename, unsigned char *rgb_data, int width, int height);
 #endif

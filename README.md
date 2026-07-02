@@ -22,12 +22,21 @@ Parses PNG/JPG chunks/markers manually, decompresses data (zlib for PNG, Huffman
 
 **Both Formats:**
 - True color output (16 million colors)
-- Half-block rendering for 2x vertical pixel density (▀)
+- Half-block rendering for 2x vertical pixel density
 - Auto-scales to terminal size via ioctl
 - Automatic format detection (PNG vs JPG)
 - Verbose debugging mode
+- Saves output to a ppm file 
 
 ## Build
 
 ```bash
-$ gcc -o image_viewer main.c png.c jpg.c -lm -lz -Iinclude
+$ gcc -o image_viewer src/jpg.c src/png.c main.c -lm -lz -Iinclude
+```
+
+## Usage
+
+```bash
+$ ./image_viewer <image_path:Required> <verbose:Optional> <output_file_name:Optional>
+```
+

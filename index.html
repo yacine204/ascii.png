@@ -114,7 +114,7 @@
             fontFamily: 'monaco, monospace',
             fontWeight: 'normal',
             letterSpacing: 0,
-            scrollback: 1000, // Keep history
+            scrollback: 1000, 
         });
 
         term.open(document.getElementById("terminal"));
@@ -141,22 +141,16 @@
                 term.writeln('');
                 
                 if (command === "clear") {
-                    term.write('\x1b[2J\x1b[H');
-                } else if (command === "help") {
-                    term.writeln('Commands:');
-                    term.writeln('  clear  - Clear the screen');
-                    term.writeln('  help   - Show this help');
-                    term.writeln('  load   - Open file picker');
-                } else if (command === "load") {
-                    document.getElementById('file').click();
-                } else if (command !== "") {
+                    term.write('\x1b[2J\x1b[3J\x1b[H')
+                    term.reset();   
+                }else{
                     term.writeln(`ascii.png:~$ ${command}: command not found`);
                 }
                 
                 userInput = '';
                 term.write("ascii.png:~$ ");
             } 
-            else if (code === 127 || code === 8) { // Backspace
+            else if (code === 127 || code === 8) {
                 if (userInput.length > 0) {
                     userInput = userInput.slice(0, -1);
                     term.write('\b \b');

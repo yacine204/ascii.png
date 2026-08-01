@@ -83,6 +83,7 @@ Jpg *extract_jpg_info(unsigned char *buffer, size_t f_len){
     jpg->dht  = extract_variable_between_headers(buffer, f_len, DHT_HEADER,  SOS_HEADER, &jpg->dht_len);
     jpg->sos  = extract_variable_between_headers(buffer, f_len, SOS_HEADER,  EOI_HEADER, &jpg->sos_len);
 
+
     return jpg;
 }
 

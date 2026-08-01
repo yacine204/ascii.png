@@ -141,9 +141,9 @@
                 term.writeln('');
                 
                 if (command === "clear") {
-                    term.write('\x1b[2J\x1b[3J\x1b[H')
+                    term.write('\x1b[2J\x1b[3J\x1b[H');
                     term.reset();   
-                }else{
+                } else {
                     term.writeln(`ascii.png:~$ ${command}: command not found`);
                 }
                 

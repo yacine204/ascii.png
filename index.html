@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" />
+        <script src="https://cdn.jsdelivr.net/npm/xterm-addon-webgl@0.16.0/lib/xterm-addon-webgl.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>ascii.png</title>
+    </head>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #111;
+        }
+
+        #core {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            width: 90%;
+            max-width: 1400px;
+        }
+
+        #terminal {
+            width: 100%;
+            height: 600px;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #1e1e1e;
+            border: 1px solid #2a2a2a;
+        }
+
+        .xterm .xterm-viewport {
+            overflow-y: auto !important;
+        }
+
+        #file {
+            align-self: flex-start;
+            padding: 6px 12px;
+            background: transparent;
+            color: #888;
+            border: 1px solid #333;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-family: monaco, monospace;
+            transition: border-color 0.2s;
+        }
+
+        #file:hover {
+            border-color: #555;
+        }
+
+        #file::file-selector-button {
+            padding: 4px 12px;
+            background: transparent;
+            color: #888;
+            border: 1px solid #333;
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: monaco, monospace;
+            font-size: 12px;
+            margin-right: 10px;
+            transition: all 0.2s;
+        }
+
+        #file::file-selector-button:hover {
+            background: #2a2a2a;
+            border-color: #555;
+            color: #aaa;
+        }
+
+        #file {
+            color: transparent;
+        }
+
+        #file::file-selector-button {
+            color: #888;
+        }
+
+        @media (max-width: 768px) {
+            #core {
+                width: 95%;
+            }
+            #terminal {
+                height: 400px;
+            }
+        }
+    </style>
+    <body>
+        <div id="core">
+            <div id="terminal"></div>
+            <input id="file" type="file" accept=".png,.jpg,.jpeg,.gif,.bmp"/>
+        </div>
+        
+        <script src="main.js"></script>
+        <script>
+        const term = new Terminal({
+            cursorBlink: true,
+            theme: { background: "#1e1e1e", foreground: '#A1A1A1' },
+            fontSize: 18,
+            fontFamily: 'monaco, monospace',
+            fontWeight: 'normal',
+            letterSpacing: 0,
+            scrollback: 1000, // Keep history
+        });
+
+        term.open(document.getElementById("terminal"));
+        const webglAddon = new WebglAddon.WebglAddon();
+        term.loadAddon(webglAddon);
+        
+        const fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+        fitAddon.fit();
+
+        window.addEventListener('resize', () => {
+            fitAddon.fit();
+        });
+
+        let userInput = '';
+        term.write("ascii.png:~$ ");
+
+        term.onData((data) => {
+            const code = data.charCodeAt(0);
+            
+            if (code === 13) { 
+                const command = userInput.trim();
+
+                term.writeln('');
+                
+                if (command === "clear") {
+                    term.write('\x1b[2J\x1b[H');
+                } else if (command === "help") {
+                    term.writeln('Commands:');
+                    term.writeln('  clear  - Clear the screen');
+                    term.writeln('  help   - Show this help');
+                    term.writeln('  load   - Open file picker');
+                } else if (command === "load") {
+                    document.getElementById('file').click();
+                } else if (command !== "") {
+                    term.writeln(`ascii.png:~$ ${command}: command not found`);
+                }
+                
+                userInput = '';
+                term.write("ascii.png:~$ ");
+            } 
+            else if (code === 127 || code === 8) { // Backspace
+                if (userInput.length > 0) {
+                    userInput = userInput.slice(0, -1);
+                    term.write('\b \b');
+                }
+            }
+            else {
+                userInput += data;
+                term.write(data);
+            }
+        });
+
+        let convertToAscii, freeAsciiBuffer, Module;
+
+        PngToAscii().then((mod) => {
+            Module = mod;
+
+            convertToAscii = Module.cwrap(
+                'convert_to_ascii',
+                'number',
+                ['number', 'number', 'number', 'number']
+            );
+            freeAsciiBuffer = Module.cwrap('free_ascii_buffer', null, ['number']);
+
+            document.getElementById("file").addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                term.writeln(`./image_viewer ${file.name}`);
+
+                const bytes = new Uint8Array(await file.arrayBuffer());
+                const dataPtr = Module._malloc(bytes.length);
+                Module.HEAPU8.set(bytes, dataPtr);
+
+                const termW = term.cols;
+                const termH = term.rows;
+                const resultPtr = convertToAscii(dataPtr, bytes.length, termW, termH);
+
+                const asciiStr = Module.UTF8ToString(resultPtr);
+
+                Module._free(dataPtr);
+                freeAsciiBuffer(resultPtr);
+
+                term.write(asciiStr + "\r\n");
+                term.write("ascii.png:~$ ");
+                
+                e.target.value = '';
+            });
+        });
+        </script>
+    </body>
+</html>

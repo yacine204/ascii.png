@@ -317,6 +317,64 @@ void convert_png_to_ascii(unsigned char *decompressed, Png *png, const char *out
     printf("\033[0m");
 }
 
+
+
+char* convert_png_to_ascii_wasm(unsigned char *decompressed, Png *png, int term_w, int term_h) {
+    int bpp = get_bytes_per_pixel(png->color_type);
+    size_t row_size = 1 + (png->width * bpp);
+
+    size_t buffer_size = (size_t)term_w * term_h * 50 + (size_t)term_h * 16 + 32;
+    char *buffer = malloc(buffer_size);
+    if (!buffer) {
+        const char *msg = "ERROR: buffer couldnt be allocated!\n";
+        char *error = malloc(strlen(msg) + 1);
+        if (error) snprintf(error, strlen(msg) + 1, "%s", msg);
+        return error;
+    }
+
+    size_t remaining = buffer_size;
+    char *write_ptr = buffer;
+    int written;
+
+    for (int ty = 0; ty < term_h; ty++) {
+        size_t y_top = (ty * 2) * png->height / (term_h * 2);
+        size_t y_bot = (ty * 2 + 1) * png->height / (term_h * 2);
+
+        unsigned char *row_top = decompressed + (y_top * row_size) + 1;
+        unsigned char *row_bot = decompressed + (y_bot * row_size) + 1;
+
+        for (int tx = 0; tx < term_w; tx++) {
+            size_t x = tx * png->width / term_w;
+            size_t idx = x * bpp;
+
+            uint8_t rt, gt, bt, rb, gb, bb;
+            if (bpp >= 3) {
+                rt = row_top[idx]; gt = row_top[idx+1]; bt = row_top[idx+2];
+                rb = row_bot[idx]; gb = row_bot[idx+1]; bb = row_bot[idx+2];
+            } else {
+                rt = gt = bt = row_top[idx];
+                rb = gb = bb = row_bot[idx];
+            }
+
+            written = snprintf(write_ptr, remaining,
+                "\033[38;2;%d;%d;%dm\033[48;2;%d;%d;%dm\xe2\x96\x80",
+                rt, gt, bt, rb, gb, bb);   // <-- fixed: use extracted vars, not row_top/row_bot directly
+
+            if (written < 0 || (size_t)written >= remaining) break;   // <-- fixed: written, not write
+            write_ptr += written;
+            remaining -= written;
+        }
+
+        written = snprintf(write_ptr, remaining, "\033[0m\r\n");
+        if (written < 0 || (size_t)written >= remaining) break;
+        write_ptr += written;
+        remaining -= written;
+    }
+
+    snprintf(write_ptr, remaining, "\033[0m");
+    return buffer;
+}
+
 bool is_png_file(unsigned char *buffer) {
     return memcmp(buffer, PNG_HEADER, PNG_HEADER_SIZE) == 0;
 }

@@ -861,6 +861,64 @@ void convert_jpg_to_ascii(unsigned char *rgb_image, int width, int height, const
     printf("\033[0m");
 }
 
+// convert_jpg_to_ascii version for wasm export 
+
+char* convert_jpg_to_ascii_wasm(unsigned char *rgb_image, int width, int height, int term_w, int term_h) {
+
+    if (!rgb_image) {
+        const char *msg = "ERROR: rgb_image is NULL!\n";
+        char *error = malloc(strlen(msg) + 1);
+        if (error) snprintf(error, strlen(msg) + 1, "%s", msg);
+        return error;
+    }
+
+    size_t buffer_size = (size_t)term_w * term_h * 50 + (size_t)term_h * 16 + 32;
+    char *buffer = malloc(buffer_size);
+    if (!buffer) {
+        const char *msg = "ERROR: buffer couldnt be allocated!\n";
+        char *error = malloc(strlen(msg) + 1);
+        if (error) snprintf(error, strlen(msg) + 1, "%s", msg);
+        return error;
+    }
+
+    size_t remaining = buffer_size;
+    char *write_ptr = buffer;
+    int written;
+
+    for (int ty = 0; ty < term_h; ty++) {
+        size_t y_top = (ty * 2) * height / (term_h * 2);
+        size_t y_bot = (ty * 2 + 1) * height / (term_h * 2);
+        if (y_top >= (size_t)height) y_top = height - 1;
+        if (y_bot >= (size_t)height) y_bot = height - 1;
+
+        unsigned char *row_top = rgb_image + (y_top * width * 3);
+        unsigned char *row_bot = rgb_image + (y_bot * width * 3);
+
+        for (int tx = 0; tx < term_w; tx++) {
+            size_t x = tx * width / term_w;
+            if (x >= (size_t)width) x = width - 1;
+            size_t idx = x * 3;
+
+            written = snprintf(write_ptr, remaining,
+                "\033[38;2;%d;%d;%dm\033[48;2;%d;%d;%dm\xe2\x96\x80",
+                row_top[idx], row_top[idx+1], row_top[idx+2],
+                row_bot[idx], row_bot[idx+1], row_bot[idx+2]);
+
+            if (written < 0 || (size_t)written >= remaining) break;
+            write_ptr += written;
+            remaining -= written;
+        }
+
+        written = snprintf(write_ptr, remaining, "\033[0m\r\n");
+        if (written < 0 || (size_t)written >= remaining) break;
+        write_ptr += written;
+        remaining -= written;
+    }
+
+    snprintf(write_ptr, remaining, "\033[0m");
+    return buffer;
+}
+
 bool is_jpg_file(unsigned char *buffer) {
     unsigned char jpg_header[] = {0xFF, 0xD8};
     return memcmp(buffer, jpg_header, 2) == 0;

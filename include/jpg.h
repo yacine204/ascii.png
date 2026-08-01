@@ -109,4 +109,5 @@ void convert_jpg_to_ascii(unsigned char *rgb_image, int width, int height,const 
 void debug_jpg(Jpg *jpg);
 bool is_jpg_file(unsigned char *buffer);
 int save_ppm(const char *filename, unsigned char *rgb_data, int width, int height);
+char* convert_jpg_to_ascii_wasm(unsigned char *rgb_image, int width, int height, int term_w, int term_h);
 #endif

@@ -39,5 +39,5 @@ bool is_png_file(unsigned char *buffer);
 bool is_jpg_file(unsigned char *buffer);
 unsigned char* file_buffer_jpg(FILE *f, size_t *f_len);
 int save_ppm(const char *filename, unsigned char *rgb_data, int width, int height);
-
+char* convert_png_to_ascii_wasm(unsigned char *decompressed, Png *png, int term_w, int term_h);
 #endif
